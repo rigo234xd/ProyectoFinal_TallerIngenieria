@@ -1,0 +1,11 @@
+# Ignorar el estado local de Terraform (contiene el mapa de tu infraestructura y posibles secretos)
+*.tfstate
+*.tfstate.backup
+
+# Ignorar la carpeta donde se descargan los providers (plugins) al hacer init
+.terraform/
+.terraform.lock.hcl
+
+# Ignorar archivos de variables que puedan contener credenciales o tokens
+*.tfvars
+*.tfvars.json
