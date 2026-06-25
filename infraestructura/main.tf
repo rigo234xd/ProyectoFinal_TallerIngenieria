@@ -1,46 +1,3 @@
-<<<<<<< Updated upstream
-# --- 1. RED BASE ---
-resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-  tags                 = { Name = "${var.project}-vpc" }
-}
-
-resource "aws_subnet" "public_a" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  map_public_ip_on_launch = true
-  tags                    = { Name = "${var.project}-subnet-publica" }
-}
-
-# --- 2. ACCESO A INTERNET ---
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.main.id
-  tags   = { Name = "${var.project}-igw" }
-}
-
-resource "aws_route_table" "public_rt" {
-  vpc_id = aws_vpc.main.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-  tags = { Name = "${var.project}-rt" }
-}
-
-resource "aws_route_table_association" "a" {
-  subnet_id      = aws_subnet.public_a.id
-  route_table_id = aws_route_table.public_rt.id
-}
-
-# --- 3. SEGURIDAD ---
-resource "aws_security_group" "web_sg" {
-  name        = "${var.project}-web-sg"
-  description = "Permitir trafico HTTP y SSH para RoadMap"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-=======
 # 1. INFRAESTRUCTURA VPC
 
 resource "aws_vpc" "main" {
@@ -109,7 +66,6 @@ resource "aws_security_group" "app_sg" {
   # Regreso/Ingreso HTTP
   ingress {
     description = "Acceso HTTP publico"
->>>>>>> Stashed changes
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"

@@ -11,10 +11,6 @@ terraform {
   }
 }
 
-<<<<<<< Updated upstream
-provider "aws" {
-  region = var.region
-=======
 #AWS
 
 provider "aws" {
@@ -26,5 +22,4 @@ provider "aws" {
       ManagedBy = "Terraform"
     }
   }
->>>>>>> Stashed changes
 }
