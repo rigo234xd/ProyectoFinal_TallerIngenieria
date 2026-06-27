@@ -1,7 +1,12 @@
-# 1. INFRAESTRUCTURA VPC
+# Consultar ip publicas
+data "http" "myip" {
+  url = "http://ipv4.icanhazip.com"
+}
+
+# 1. Infraestructura de RED
 
 resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
+  cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
 
@@ -11,12 +16,10 @@ resource "aws_vpc" "main" {
   }
 }
 
-# 2. SEGMENTACIÓN DE RED (SUBNETS)
-
-# Subred Pública
+# Subred Pública 
 resource "aws_subnet" "public_1" {
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
+  cidr_block              = var.public_subnet_cidr
   map_public_ip_on_launch = true
   availability_zone       = "${var.region}a"
 
@@ -26,7 +29,18 @@ resource "aws_subnet" "public_1" {
   }
 }
 
-# 3. ROUTING
+# Subred Privada 
+resource "aws_subnet" "private_1" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_subnet_cidr
+  availability_zone = "${var.region}a"
+
+  tags = {
+    Name        = "${var.project}-private-subnet-1a"
+    Environment = "Taller-Proyecto"
+  }
+}
+# 2. Enrutamiento
 
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
@@ -37,7 +51,6 @@ resource "aws_internet_gateway" "gw" {
   }
 }
 
-# Tabla de Enrutamiento
 resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.main.id
 
@@ -57,13 +70,14 @@ resource "aws_route_table_association" "public_assoc" {
   route_table_id = aws_route_table.public_rt.id
 }
 
-# 4. SECURITY GROUPS
+# 3. Segurity group
+
 resource "aws_security_group" "app_sg" {
   name        = "${var.project}-app-security-group"
-  description = "Control de acceso para la capa de aplicacion del taller"
+  description = "Control de acceso perimetral para la aplicacion"
   vpc_id      = aws_vpc.main.id
 
-  # Regreso/Ingreso HTTP
+  # Ingreso HTTP abierto al público general (Puerto 80)
   ingress {
     description = "Acceso HTTP publico"
     from_port   = 80
@@ -72,33 +86,36 @@ resource "aws_security_group" "app_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Regreso/Ingreso SSH
+  # Ingreso SSH RESTRINGIDO dinámicamente 
   ingress {
-    description = "Acceso SSH para administracion"
+    description = "Acceso SSH protegido para administracion"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["${chomp(data.http.myip.response_body)}/32"]
   }
-# Tráfico de Salida (Egress)
+
+  # Tráfico de salida irrestricto 
   egress {
     description = "Salida irrestricta al exterior"
     from_port   = 0
     to_port     = 0
-    protocol    = "-1" # todos los protocolos 
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
     Name        = "${var.project}-app-sg"
-    Environment = "Taller-Avance"
+    Environment = "Taller-Proyecto"
   }
 }
 
-resource "aws_instance" "app_server" {
-  ami           = "ami-0c7217cdde317cfec" # Ubuntu Server v22.04 LTS
-  instance_type = "t2.micro"              # Capa gratuita elegible
-  subnet_id     = aws_subnet.public_1.id
+# 4. DB
+
+resource "aws_instance" "backend" {
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.public_1.id
   vpc_security_group_ids = [aws_security_group.app_sg.id]
 
   user_data = <<-EOF
@@ -109,6 +126,35 @@ resource "aws_instance" "app_server" {
               EOF
 
   tags = {
-    Name = "${var.project}-backend-server"
+    Name        = "${var.project}-api-server"
+    Environment = "Taller-Proyecto"
+  }
+}
+
+# Almacenamiento Estático S3
+resource "aws_s3_bucket" "datos" {
+  bucket        = "${var.project}-frontend-roadmap"
+  force_destroy = true # Facilita el borrado limpio en entornos académicos
+
+  tags = {
+    Name        = "${var.project}-frontend-bucket"
+    Environment = "Taller-Proyecto"
+  }
+}
+
+# Base de Datos NoSQL
+resource "aws_dynamodb_table" "db_proyecto" {
+  name         = "${var.project}-app-data"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  tags = {
+    Name        = "${var.project}-dynamodb-table"
+    Environment = "Taller-Proyecto"
   }
 }

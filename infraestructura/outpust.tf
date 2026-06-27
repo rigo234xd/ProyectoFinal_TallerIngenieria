@@ -14,6 +14,21 @@ output "public_subnet_id" {
 }
 
 output "security_group_id" {
-  description = "El ID del Grupo de Seguridad (Firewall) perimetral para la aplicación"
+  description = "El ID del Grupo de Seguridad perimetral para la aplicación"
   value       = aws_security_group.app_sg.id
+}
+
+output "private_subnet_id" {
+  description = "El ID de la subred privada creada para la proteccion de datos"
+  value       = aws_subnet.private_1.id
+}
+
+output "ec2_public_ip" {
+  description = "Direccion IP publica asignada al servidor de backend"
+  value       = aws_instance.backend.public_ip
+}
+
+output "dynamodb_table_name" {
+  description = "Nombre de la base de datos provisionada"
+  value       = aws_dynamodb_table.db_proyecto.name
 }
