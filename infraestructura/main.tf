@@ -72,51 +72,20 @@ resource "aws_security_group" "app_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-<<<<<<< Updated upstream
-  ingress {
-=======
   # Regreso/Ingreso SSH
   ingress {
     description = "Acceso SSH para administracion"
->>>>>>> Stashed changes
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-<<<<<<< Updated upstream
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  tags = { Name = "${var.project}-sg" }
-}
-
-# --- 4. CÓMPUTO Y ALMACENAMIENTO ---
-resource "aws_instance" "backend" {
-  ami                    = "ami-04b70fa74e45c3917"
-  instance_type          = "t2.micro"
-  subnet_id              = aws_subnet.public_a.id
-  vpc_security_group_ids = [aws_security_group.web_sg.id]
-
-  # key_name = "mi-llave-aws" # Necesitarás descomentar esto y poner el nombre de tu llave
-
-  tags = { Name = "${var.project}-api-server" }
-}
-
-resource "aws_s3_bucket" "datos" {
-  bucket = "${var.project}-frontend-roadmap"
-=======
-Tráfico de Salida (Egress)
-  # 
+# Tráfico de Salida (Egress)
   egress {
     description = "Salida irrestricta al exterior"
     from_port   = 0
     to_port     = 0
-    protocol    = "-1" # Significa todos los protocolos
+    protocol    = "-1" # todos los protocolos 
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -124,5 +93,22 @@ Tráfico de Salida (Egress)
     Name        = "${var.project}-app-sg"
     Environment = "Taller-Avance"
   }
->>>>>>> Stashed changes
+}
+
+resource "aws_instance" "app_server" {
+  ami           = "ami-0c7217cdde317cfec" # Ubuntu Server v22.04 LTS
+  instance_type = "t2.micro"              # Capa gratuita elegible
+  subnet_id     = aws_subnet.public_1.id
+  vpc_security_group_ids = [aws_security_group.app_sg.id]
+
+  user_data = <<-EOF
+              #!/bin/bash
+              sudo apt-get update
+              sudo apt-get install -y docker.io
+              sudo systemctl start docker
+              EOF
+
+  tags = {
+    Name = "${var.project}-backend-server"
+  }
 }
