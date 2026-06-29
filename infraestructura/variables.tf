@@ -6,7 +6,7 @@ variable "region" {
 
 variable "project" {
   type        = string
-  default     = "ulagos-fdici12"
+  default     = "hito1-fdici12"
   description = "Código o nombre del proyecto utilizado para estandarizar etiquetas y nombres"
 }
 
@@ -36,6 +36,6 @@ variable "ami_id" {
 
 variable "instance_type" {
   type        = string
-  default     = "t2.micro"
+  default     = "t3.micro"
   description = "Tipo y tamaño de la instancia de cómputo EC2"
 }
