@@ -70,7 +70,7 @@ resource "aws_route_table_association" "public_assoc" {
   route_table_id = aws_route_table.public_rt.id
 }
 
-# 3. Segurity group
+# 3. Security group
 
 resource "aws_security_group" "app_sg" {
   name        = "${var.project}-app-security-group"
@@ -134,7 +134,7 @@ resource "aws_instance" "backend" {
 # Almacenamiento Estático S3
 resource "aws_s3_bucket" "datos" {
   bucket        = "${var.project}-frontend-roadmap"
-  force_destroy = true # Facilita el borrado limpio en entornos académicos
+  force_destroy = true # Facilita el borrado limpio
 
   tags = {
     Name        = "${var.project}-frontend-bucket"
@@ -157,4 +157,10 @@ resource "aws_dynamodb_table" "db_proyecto" {
     Name        = "${var.project}-dynamodb-table"
     Environment = "Taller-Proyecto"
   }
+}
+
+# 5. Modularización
+
+module "backend_preparacion" {
+  source = "./prep_backend"
 }

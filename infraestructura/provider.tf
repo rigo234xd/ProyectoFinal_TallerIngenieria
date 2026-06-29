@@ -8,13 +8,17 @@ terraform {
     key          = "taller-ingenieria/hito1/terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true
-    use_lockfile = true 
+    use_lockfile = true
   }
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0" 
+      version = "~> 5.0"
+    }
+    http = {
+      source  = "hashicorp/http"
+      version = "~> 3.0"
     }
   }
 }
@@ -22,7 +26,7 @@ terraform {
 #AWS
 
 provider "aws" {
-  region = var.region 
+  region = var.region
 
   default_tags {
     tags = {
