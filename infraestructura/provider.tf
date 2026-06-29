@@ -1,10 +1,8 @@
-# CONFIGURACIÓN DE REQUERIMIENTOS DE TERRAFORM Y PROVEEDORES
-
 terraform {
   required_version = ">= 1.0.0"
 
   backend "s3" {
-    bucket       = "ulagos-fdici12-terraform-state-bucket"
+    bucket       = "hito1-bucket"
     key          = "taller-ingenieria/hito1/terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true
@@ -16,22 +14,9 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    http = {
-      source  = "hashicorp/http"
-      version = "~> 3.0"
-    }
   }
 }
 
-#AWS
-
 provider "aws" {
   region = var.region
-
-  default_tags {
-    tags = {
-      Project   = var.project
-      ManagedBy = "Terraform"
-    }
-  }
 }
