@@ -111,20 +111,7 @@ resource "aws_security_group" "app_sg" {
   }
 }
 
-# 4. CÓMPUTO, ALMACENAMIENTO Y BASE DE DATOS
-
-# Servidor Backend de la Aplicación
-resource "aws_instance" "backend" {
-  ami                    = var.ami_id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public_1.id
-  vpc_security_group_ids = [aws_security_group.app_sg.id]
-
-  tags = {
-    Name        = "${var.project}-api-server"
-    Environment = "Taller-Proyecto"
-  }
-}
+# 4. CÓMPUTO SERVERLESS, ALMACENAMIENTO Y BASE DE DATOS
 
 # Almacenamiento Estático S3
 resource "aws_s3_bucket" "datos" {
@@ -153,6 +140,118 @@ resource "aws_dynamodb_table" "db_proyecto" {
     Environment = "Taller-Proyecto"
   }
 }
+
+# --- INFRAESTRUCTURA SERVERLESS ---
+
+# A. Rol IAM para Lambda (Principio de Mínimo Privilegio)
+resource "aws_iam_role" "lambda_exec" {
+  name = "${var.project}-lambda-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+}
+
+# Permiso básico para que Lambda escriba logs en CloudWatch
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Permiso estricto para que Lambda solo acceda a TU tabla de DynamoDB
+resource "aws_iam_policy" "dynamodb_access" {
+  name        = "${var.project}-dynamodb-policy"
+  description = "Permisos de DynamoDB para el backend de Lambda"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "dynamodb:Scan",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:GetItem"
+      ]
+      Resource = aws_dynamodb_table.db_proyecto.arn
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = aws_iam_policy.dynamodb_access.arn
+}
+
+# B. Función Lambda
+resource "aws_lambda_function" "api_backend" {
+  # IMPORTANTE: El archivo "backend.zip" debe estar en la misma carpeta que main.tf
+  filename      = "backend.zip"
+  function_name = "${var.project}-api-backend"
+  role          = aws_iam_role.lambda_exec.arn
+
+  # Si tu código transpilado de reportes.ts exporta "handler" en un archivo "reportes.js", esto debe ser "reportes.handler"
+  # Si usas el server.js envuelto en serverless-http, esto debería ser "server.handler"
+  handler = "reportes.handler"
+
+  runtime          = "nodejs20.x"
+  source_code_hash = filebase64sha256("backend.zip")
+
+  environment {
+    variables = {
+      DYNAMO_TABLE_NAME = aws_dynamodb_table.db_proyecto.name
+    }
+  }
+
+  tags = {
+    Name        = "${var.project}-lambda"
+    Environment = "Taller-Proyecto"
+  }
+}
+
+# C. API Gateway (Para exponer la Lambda a internet)
+resource "aws_apigatewayv2_api" "http_api" {
+  name          = "${var.project}-http-api"
+  protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_origins = ["*"] # Para pruebas locales y acceso web.
+    allow_methods = ["GET", "POST", "OPTIONS", "PUT", "DELETE"]
+    allow_headers = ["Content-Type", "Authorization"]
+  }
+}
+
+resource "aws_apigatewayv2_stage" "default" {
+  api_id      = aws_apigatewayv2_api.http_api.id
+  name        = "$default"
+  auto_deploy = true
+}
+
+resource "aws_apigatewayv2_integration" "lambda_integration" {
+  api_id           = aws_apigatewayv2_api.http_api.id
+  integration_type = "AWS_PROXY"
+  integration_uri  = aws_lambda_function.api_backend.invoke_arn
+}
+
+resource "aws_apigatewayv2_route" "default_route" {
+  api_id    = aws_apigatewayv2_api.http_api.id
+  route_key = "ANY /{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+}
+
+resource "aws_lambda_permission" "api_gw" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api_backend.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/*/*"
+}
+
 # 5. DISTRIBUCIÓN DE CONTENIDO (CLOUDFRONT)
 
 # Control de Acceso (OAC) para que CloudFront lea el Bucket S3 de forma segura
@@ -229,4 +328,16 @@ resource "aws_s3_bucket_policy" "cdn_policy" {
       }
     ]
   })
+}
+
+# 6. OUTPUTS 
+
+output "api_url" {
+  value       = aws_apigatewayv2_api.http_api.api_endpoint
+  description = "URL base de la API Gateway para tu backend. Cópiala y pégala en tu código Frontend de React."
+}
+
+output "cloudfront_domain" {
+  value       = aws_cloudfront_distribution.frontend_cdn.domain_name
+  description = "URL pública de tu Frontend alojado en CloudFront."
 }

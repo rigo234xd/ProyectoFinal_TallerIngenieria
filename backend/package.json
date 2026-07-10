@@ -1,20 +1,11 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js", "type": "module",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "description": "Backend Serverless en Lambda",
+  "type": "module",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1079.0",
     "@aws-sdk/lib-dynamodb": "^3.1079.0",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
     "uuid": "^14.0.1"
   }
 }

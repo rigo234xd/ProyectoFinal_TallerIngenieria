@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
-const API_URL = 'http://localhost:3000/api';
+const API_URL = 'https://3kq508aiof.execute-api.us-east-1.amazonaws.com';
 
 export default function AddReport() {
   const { sectorId, subSectorId } = useParams();
@@ -21,7 +21,9 @@ export default function AddReport() {
 
     try {
       const fullSubSector = `${sectorId}/${subSectorId}`;
-      const res = await fetch(`${API_URL}/reports`, {
+      
+      // CORRECCIÓN: Se agregó "/api" antes de "/reports"
+      const res = await fetch(`${API_URL}/api/reports`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -35,11 +37,11 @@ export default function AddReport() {
       if (res.ok) {
         navigate(`/sector/${sectorId}`);
       } else {
-        alert('Error al enviar el reporte');
+        alert('Error al enviar el reporte. Revisa la consola para más detalles.');
       }
     } catch (error) {
       console.error(error);
-      alert('Error de conexión');
+      alert('Error de conexión con el servidor.');
     }
     setLoading(false);
   };
