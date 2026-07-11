@@ -6,7 +6,7 @@ variable "region" {
 
 variable "project" {
   type        = string
-  default     = "hito1-fdici12"
+  default     = "ulalert-fdici12"
   description = "Código o nombre del proyecto utilizado para estandarizar etiquetas y nombres"
 }
 
