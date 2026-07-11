@@ -156,33 +156,6 @@ Ulalert sigue las mejores prácticas de AWS:
 
 ---
 
-# FinOps
-
-Para facilitar la administración de costos, todos los recursos creados poseen la etiqueta:
-
-```text
-Environment = "Taller-Proyecto"
-```
-
-Esto permite:
-
-- Auditoría de recursos.
-- Control de presupuesto.
-- Fácil identificación de infraestructura.
-
----
-
-# Git
-
-El proyecto incluye un `.gitignore` configurado para evitar subir:
-
-- Archivos `.tfstate`
-- Credenciales temporales
-- Archivos generados automáticamente
-- Dependencias locales
-
----
-
 # Limpieza de Recursos
 
 Una vez finalizada la evaluación del proyecto, elimina toda la infraestructura para evitar costos innecesarios.
