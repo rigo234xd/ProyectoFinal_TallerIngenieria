@@ -42,13 +42,13 @@ Antes de ejecutar el despliegue, es necesario personalizar el nombre del bucket 
 Por ello, cada integrante debe modificar el nombre del bucket definido en el archivo de Terraform correspondiente (provider o variables, según la configuración del proyecto) y asignarle un nombre único. Una buena práctica es incluir tu nombre, apellido o iniciales, por ejemplo:
 
 ```text
-ulalert-frontend-rigo
+ulalert-frontend-hito2
 ```
 
 o
 
 ```text
-ulalert-frontend-pamela-acuna
+ulalert-frontend
 ```
 
 Realizar este cambio antes del despliegue evitará conflictos durante la creación de la infraestructura y permitirá que cada usuario disponga de su propio entorno de trabajo.
