@@ -1,4 +1,4 @@
-# Ulalert: Campus Incident Management
+# Ulalert: 
 
 Bienvenido al repositorio oficial de **Ulalert**, una plataforma moderna, escalable y **100% Serverless**, diseñada para la gestión eficiente de incidencias dentro de la **Universidad de Los Lagos**.
 
