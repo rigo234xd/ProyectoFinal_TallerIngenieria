@@ -205,6 +205,7 @@ resource "aws_lambda_function" "api_backend" {
   environment {
     variables = {
       DYNAMO_TABLE_NAME = aws_dynamodb_table.db_proyecto.name
+      GOOGLE_CLIENT_ID  = var.google_client_id
     }
   }
 
@@ -274,6 +275,21 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = "index.html" # Archivo principal de React/Vite
+
+  # Manejo de rutas SPA para React Router (Redirige 404/403 a index.html)
+  custom_error_response {
+    error_caching_min_ttl = 10
+    error_code            = 404
+    response_code         = 200
+    response_page_path    = "/index.html"
+  }
+  
+  custom_error_response {
+    error_caching_min_ttl = 10
+    error_code            = 403
+    response_code         = 200
+    response_page_path    = "/index.html"
+  }
 
   default_cache_behavior {
     allowed_methods  = ["GET", "HEAD", "OPTIONS"]

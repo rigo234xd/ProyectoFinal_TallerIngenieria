@@ -1,6 +1,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, ScanCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, ScanCommand, PutCommand, UpdateCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
+import { OAuth2Client } from "google-auth-library";
 
 // Inicializamos DynamoDB. En AWS Lambda, esto detecta automáticamente tu Rol IAM.
 const client = new DynamoDBClient({}); 
@@ -8,35 +9,76 @@ const docClient = DynamoDBDocumentClient.from(client);
 
 // Tomamos el nombre de la tabla desde las variables de entorno de Terraform
 const TABLE_NAME = process.env.DYNAMO_TABLE_NAME || "hito1-fdici12-app-data";
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+// Función auxiliar para verificar roles y token
+async function verifyUserRole(token) {
+    if (!token) throw new Error("No token provided");
+    const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: GOOGLE_CLIENT_ID
+    });
+    const payload = ticket.getPayload();
+    const email = payload.email;
+
+    if (!email.endsWith('@alumnos.ulagos.cl') && email !== 'admin@ulagos.cl' && email !== 'coordinador@ulagos.cl') {
+        throw new Error("Dominio no autorizado");
+    }
+
+    const adminCheck = await docClient.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { id: `ADMIN#${email}` }
+    }));
+
+    return {
+        email,
+        name: payload.name,
+        picture: payload.picture,
+        role: adminCheck.Item ? "admin" : "student"
+    };
+}
 
 export const handler = async (event) => {
-    // 1. Configuración de CORS obligatoria para API Gateway
     const headers = {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*", // Para que tu Frontend en CloudFront no sea bloqueado
+        "Access-Control-Allow-Origin": "*", 
         "Access-Control-Allow-Methods": "OPTIONS,GET,POST,PUT,DELETE",
         "Access-Control-Allow-Headers": "Content-Type,Authorization"
     };
 
     try {
-        // 2. API Gateway HTTP API inyecta el método y la ruta aquí:
         const method = event.requestContext?.http?.method || event.httpMethod;
         const path = event.rawPath || event.path;
-
         console.log(`[LOG] Recibida petición: ${method} ${path}`);
 
-        // Manejo de Preflight (Peticiones automáticas del navegador para CORS)
         if (method === "OPTIONS") {
             return { statusCode: 200, headers, body: JSON.stringify({ message: "CORS OK" }) };
         }
 
-        // --- RUTA: GET /health ---
         if (method === "GET" && path === "/health") {
             return { statusCode: 200, headers, body: JSON.stringify({ status: "ok" }) };
         }
 
-        // --- RUTA: GET /api/reports ---
-        if (method === "GET" && path === "/api/reports") {
+        // Obtener el token del header Authorization
+        const authHeader = event.headers?.authorization || event.headers?.Authorization || "";
+        const token = authHeader.replace("Bearer ", "");
+
+        // --- RUTA: POST /api/auth/verify ---
+        if (method === "POST" && path === "/api/auth/verify") {
+            const body = JSON.parse(event.body || "{}");
+            if (!body.token) return { statusCode: 400, headers, body: JSON.stringify({ error: "Token requerido" }) };
+            
+            try {
+                const user = await verifyUserRole(body.token);
+                return { statusCode: 200, headers, body: JSON.stringify({ role: user.role, user }) };
+            } catch (err) {
+                return { statusCode: 401, headers, body: JSON.stringify({ error: err.message }) };
+            }
+        }
+
+        // --- RUTA: GET /api/reports/public --- (Todos los usuarios)
+        if (method === "GET" && (path === "/api/reports/public" || path === "/api/reports")) {
             const queryParams = event.queryStringParameters || {};
             const subSector = queryParams.subSector;
             const sort = queryParams.sort || 'utility';
@@ -44,12 +86,11 @@ export const handler = async (event) => {
             const result = await docClient.send(new ScanCommand({ TableName: TABLE_NAME }));
             let reports = result.Items || [];
 
-            // Filtrar
-            if (subSector) {
-                reports = reports.filter(r => r.subSector === subSector);
-            }
+            // Filtrar solo aprobados o en progreso (ignorar los que son ADMIN# o pendientes)
+            reports = reports.filter(r => !r.id.startsWith("ADMIN#") && (r.estado === "aprobado" || r.estado === "en_progreso"));
 
-            // Ordenar
+            if (subSector) reports = reports.filter(r => r.subSector === subSector);
+
             reports.sort((a, b) => {
                 if (sort === 'importance') return b.importance - a.importance;
                 if (sort === 'date') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -59,62 +100,139 @@ export const handler = async (event) => {
             return { statusCode: 200, headers, body: JSON.stringify(reports) };
         }
 
-        // --- RUTA: POST /api/reports ---
-        if (method === "POST" && path === "/api/reports") {
-            const body = JSON.parse(event.body || "{}");
-            const { subSector, title, description, importance } = body;
+        // --- RUTA protegida: GET /api/reports/admin ---
+        if (method === "GET" && path === "/api/reports/admin") {
+            try {
+                const user = await verifyUserRole(token);
+                if (user.role !== "admin") throw new Error("No admin");
 
-            const newReport = {
-                id: uuidv4(),
-                subSector,
-                title,
-                description,
-                importance: parseInt(importance, 10),
-                createdAt: new Date().toISOString(),
-                utility: 0 // Likes iniciales
-            };
+                const result = await docClient.send(new ScanCommand({ TableName: TABLE_NAME }));
+                let reports = result.Items || [];
+                // Admin ve todo menos lo resuelto (para poder gestionarlo)
+                reports = reports.filter(r => !r.id.startsWith("ADMIN#") && !r.id.startsWith("LIKE#") && r.estado !== "resuelto");
 
-            await docClient.send(new PutCommand({
-                TableName: TABLE_NAME,
-                Item: newReport
-            }));
-
-            return { statusCode: 201, headers, body: JSON.stringify(newReport) };
+                // Más antiguos primero
+                reports.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                return { statusCode: 200, headers, body: JSON.stringify(reports) };
+            } catch (err) {
+                return { statusCode: 403, headers, body: JSON.stringify({ error: "Acceso denegado" }) };
+            }
         }
 
-        // --- RUTA: POST /api/reports/:id/like ---
+        // --- RUTA protegida: POST /api/reports ---
+        if (method === "POST" && path === "/api/reports") {
+            try {
+                const user = await verifyUserRole(token);
+                const body = JSON.parse(event.body || "{}");
+                const { subSector, title, description, importance, imageUrl } = body;
+
+                const newReport = {
+                    id: uuidv4(),
+                    subSector,
+                    title,
+                    description,
+                    importance: parseInt(importance, 10),
+                    imageUrl: imageUrl || null,
+                    createdAt: new Date().toISOString(),
+                    utility: 0,
+                    estado: "pendiente",
+                    criticidad: "por_asignar",
+                    createdBy: user.email
+                };
+
+                await docClient.send(new PutCommand({ TableName: TABLE_NAME, Item: newReport }));
+                return { statusCode: 201, headers, body: JSON.stringify(newReport) };
+            } catch (err) {
+                return { statusCode: 401, headers, body: JSON.stringify({ error: "No autorizado para crear reportes" }) };
+            }
+        }
+
+        // --- RUTA protegida: PUT /api/reports/:id/status ---
+        const statusMatch = path.match(/^\/api\/reports\/([^\/]+)\/status$/);
+        if (method === "PUT" && statusMatch) {
+            try {
+                const user = await verifyUserRole(token);
+                if (user.role !== "admin") throw new Error("No admin");
+
+                const reportId = statusMatch[1];
+                const body = JSON.parse(event.body || "{}");
+                const { estado, criticidad } = body;
+
+                if (!estado || !criticidad) return { statusCode: 400, headers, body: JSON.stringify({ error: "Faltan datos" }) };
+
+                const params = {
+                    TableName: TABLE_NAME,
+                    Key: { id: reportId },
+                    UpdateExpression: "SET estado = :e, criticidad = :c",
+                    ExpressionAttributeValues: {
+                        ":e": estado,
+                        ":c": criticidad
+                    },
+                    ReturnValues: "ALL_NEW"
+                };
+                const result = await docClient.send(new UpdateCommand(params));
+                return { statusCode: 200, headers, body: JSON.stringify(result.Attributes) };
+            } catch (err) {
+                return { statusCode: 403, headers, body: JSON.stringify({ error: "Acceso denegado" }) };
+            }
+        }
+
+        // --- RUTA protegida: POST /api/reports/:id/like ---
         const likeMatch = path.match(/^\/api\/reports\/([^\/]+)\/like$/);
         if (method === "POST" && likeMatch) {
-            const reportId = likeMatch[1]; 
+            try {
+                const user = await verifyUserRole(token);
+                const reportId = likeMatch[1]; 
+                
+                // 1. Intentar registrar el voto (falla si ya existe)
+                try {
+                    await docClient.send(new PutCommand({
+                        TableName: TABLE_NAME,
+                        Item: { id: `LIKE#${reportId}#${user.email}`, reportId, email: user.email },
+                        ConditionExpression: "attribute_not_exists(id)"
+                    }));
+                } catch (putErr) {
+                    if (putErr.name === "ConditionalCheckFailedException") {
+                        return { statusCode: 400, headers, body: JSON.stringify({ error: "Ya has apoyado este reporte" }) };
+                    }
+                    throw putErr;
+                }
 
-            const params = {
-                TableName: TABLE_NAME,
-                Key: { id: reportId },
-                UpdateExpression: "SET utility = if_not_exists(utility, :start) + :inc",
-                ExpressionAttributeValues: {
-                    ":inc": 1,
-                    ":start": 0
-                },
-                ReturnValues: "ALL_NEW"
-            };
-
-            const result = await docClient.send(new UpdateCommand(params));
-            return { statusCode: 200, headers, body: JSON.stringify(result.Attributes) };
+                // 2. Si tuvo éxito, incrementamos
+                const params = {
+                    TableName: TABLE_NAME,
+                    Key: { id: reportId },
+                    UpdateExpression: "SET utility = if_not_exists(utility, :start) + :inc",
+                    ExpressionAttributeValues: { ":inc": 1, ":start": 0 },
+                    ReturnValues: "ALL_NEW"
+                };
+                const result = await docClient.send(new UpdateCommand(params));
+                return { statusCode: 200, headers, body: JSON.stringify(result.Attributes) };
+            } catch (err) {
+                return { statusCode: 401, headers, body: JSON.stringify({ error: "Debe iniciar sesión para apoyar" }) };
+            }
         }
 
-        // Si la ruta no existe
-        return { 
-            statusCode: 404, 
-            headers, 
-            body: JSON.stringify({ error: "Ruta no encontrada" }) 
-        };
+        // --- RUTA protegida: GET /api/users/me ---
+        if (method === "GET" && path === "/api/users/me") {
+            try {
+                const user = await verifyUserRole(token);
+                const result = await docClient.send(new ScanCommand({ TableName: TABLE_NAME }));
+                const items = result.Items || [];
+
+                const myReports = items.filter(r => !r.id.startsWith("ADMIN#") && !r.id.startsWith("LIKE#") && r.createdBy === user.email);
+                const myLikes = items.filter(r => r.id.startsWith(`LIKE#`) && r.id.endsWith(`#${user.email}`)).map(r => r.reportId);
+
+                return { statusCode: 200, headers, body: JSON.stringify({ myReports, myLikes }) };
+            } catch (err) {
+                return { statusCode: 401, headers, body: JSON.stringify({ error: "Sesión inválida" }) };
+            }
+        }
+
+        return { statusCode: 404, headers, body: JSON.stringify({ error: "Ruta no encontrada" }) };
 
     } catch (error) {
         console.error("Error en el backend Lambda:", error);
-        return { 
-            statusCode: 500, 
-            headers, 
-            body: JSON.stringify({ error: "Error interno del servidor" }) 
-        };
+        return { statusCode: 500, headers, body: JSON.stringify({ error: "Error interno del servidor" }) };
     }
 };

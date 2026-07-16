@@ -2,7 +2,7 @@ terraform {
   required_version = ">= 1.0.0"
 
   backend "s3" {
-    bucket       = "hito1-bucket"
+    bucket       = "ulalert-bucket-olea"
     key          = "taller-ingenieria/hito1/terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true

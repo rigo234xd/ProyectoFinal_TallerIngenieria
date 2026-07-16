@@ -6,7 +6,7 @@ variable "region" {
 
 variable "project" {
   type        = string
-  default     = "hito1-fdici12"
+  default     = "hito1-fdici12-olea"
   description = "Código o nombre del proyecto utilizado para estandarizar etiquetas y nombres"
 }
 
@@ -38,4 +38,10 @@ variable "instance_type" {
   type        = string
   default     = "t3.micro"
   description = "Tipo y tamaño de la instancia de cómputo EC2"
+}
+
+variable "google_client_id" {
+  type        = string
+  default     = "625056732088-tngun4588isb99eln5mcgt6eba797ecq.apps.googleusercontent.com"
+  description = "Client ID para verificar tokens de Google OAuth"
 }

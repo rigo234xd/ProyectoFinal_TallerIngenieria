@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ThumbsUp, AlertTriangle, Calendar } from 'lucide-react';
+import { AuthContext } from '../context/AuthContext';
 
 const SECTORS_DATA = {
   'biblioteca': { name: 'Biblioteca', subSectors: [{id:'salas', name:'Salas'}, {id:'logias', name:'Logias'}, {id:'baños', name:'Baños'}] },
@@ -10,11 +11,12 @@ const SECTORS_DATA = {
 };
 
 // Tu nueva URL de API Gateway
-const API_URL = 'https://3kq508aiof.execute-api.us-east-1.amazonaws.com';
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function SectorView() {
   const { sectorId } = useParams();
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const sector = SECTORS_DATA[sectorId];
   
   const [activeSubSector, setActiveSubSector] = useState(sector?.subSectors[0]?.id || '');
@@ -31,8 +33,8 @@ export default function SectorView() {
     setLoading(true);
     try {
       const fullSubSectorId = `${sectorId}/${activeSubSector}`;
-      // CORRECCIÓN 1: Agregamos "/api" antes de "/reports"
-      const res = await fetch(`${API_URL}/api/reports?subSector=${fullSubSectorId}&sort=${sortBy}`);
+      // Ahora consume el endpoint público
+      const res = await fetch(`${API_URL}/api/reports/public?subSector=${fullSubSectorId}&sort=${sortBy}`);
       const data = await res.json();
       
       // CORRECCIÓN 2: El salvavidas. Asegurarnos de que si hay un error, reports sea un arreglo vacío y no colapse
@@ -49,12 +51,32 @@ export default function SectorView() {
   };
 
   const handleLike = async (reportId) => {
+    if (!user) {
+      alert("Debes iniciar sesión con tu correo institucional para apoyar un reporte.");
+      navigate('/login');
+      return;
+    }
+
     try {
-      // CORRECCIÓN 3: Agregamos "/api" también aquí
-      await fetch(`${API_URL}/api/reports/${reportId}/like`, { method: 'POST' });
+      const res = await fetch(`${API_URL}/api/reports/${reportId}/like`, { 
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user.token}`
+        }
+      });
+      
+      if (res.status === 400) {
+        alert("Ya has apoyado este reporte anteriormente.");
+        return;
+      }
+      if (!res.ok) {
+        throw new Error("Error en el servidor");
+      }
+
       fetchReports(); // Recargar para actualizar likes
     } catch (error) {
       console.error("Error al dar like:", error);
+      alert("Hubo un error al procesar tu apoyo.");
     }
   };
 
@@ -112,8 +134,8 @@ export default function SectorView() {
           {/* CORRECCIÓN 4: Agregamos el '?' al map por máxima seguridad */}
           {reports?.map(report => (
             <div key={report.id} className="report-card glass-card">
-              <div className="report-header">
-                <div>
+              <div className="report-header" style={{ alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
                   <h3 className="report-title">{report.title}</h3>
                   <div className="report-meta">
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -122,18 +144,25 @@ export default function SectorView() {
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                       <AlertTriangle size={14} />
-                      Nivel: {report.importance}
+                      Criticidad: <strong style={{textTransform:'capitalize'}}>{report.criticidad?.replace('_',' ')}</strong>
                     </span>
                   </div>
                 </div>
-                <span className={`badge ${
-                  report.importance >= 4 ? 'badge-alta' : report.importance === 3 ? 'badge-media' : 'badge-baja'
-                }`}>
-                  {report.importance >= 4 ? 'Alta' : report.importance === 3 ? 'Media' : 'Baja'}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                  <span className={`badge ${report.estado === 'en_progreso' ? 'badge-media' : 'badge-baja'}`}>
+                    {report.estado === 'en_progreso' ? '🚧 En Progreso' : '✅ Aprobado'}
+                  </span>
+                </div>
               </div>
-              <p className="report-description">{report.description}</p>
-              <div className="report-footer">
+              <p className="report-description" style={{ marginTop: '0.5rem' }}>{report.description}</p>
+              
+              {report.imageUrl && (
+                <div style={{ marginTop: '1rem', borderRadius: '8px', overflow: 'hidden' }}>
+                  <img src={report.imageUrl} alt="Evidencia del reporte" style={{ width: '100%', maxHeight: '300px', objectFit: 'cover' }} />
+                </div>
+              )}
+              
+              <div className="report-footer" style={{ marginTop: '1rem' }}>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                   A {report.utility || 0} personas les sirvió esto
                 </span>

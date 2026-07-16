@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
-const API_URL = 'https://3kq508aiof.execute-api.us-east-1.amazonaws.com';
+const API_URL = import.meta.env.VITE_API_URL;
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 export default function AddReport() {
   const { sectorId, subSectorId } = useParams();
@@ -14,23 +16,52 @@ export default function AddReport() {
     description: '',
     importance: '3'
   });
+  const [imageFile, setImageFile] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      let imageUrl = null;
+
+      if (imageFile) {
+        if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+          alert('Configuración de Cloudinary faltante en .env');
+          setLoading(false);
+          return;
+        }
+        
+        const formDataCloudinary = new FormData();
+        formDataCloudinary.append('file', imageFile);
+        formDataCloudinary.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+          method: 'POST',
+          body: formDataCloudinary
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error('Error al subir la imagen a Cloudinary');
+        }
+
+        const uploadData = await uploadRes.json();
+        imageUrl = uploadData.secure_url;
+      }
+
       const fullSubSector = `${sectorId}/${subSectorId}`;
+      const userLocal = JSON.parse(localStorage.getItem('ulalert_user'));
       
-      // CORRECCIÓN: Se agregó "/api" antes de "/reports"
       const res = await fetch(`${API_URL}/api/reports`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userLocal?.token}`
         },
         body: JSON.stringify({
           subSector: fullSubSector,
-          ...formData
+          ...formData,
+          imageUrl
         })
       });
 
@@ -86,7 +117,7 @@ export default function AddReport() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="importance">Nivel de Importancia (1-5)</label>
+            <label htmlFor="importance">Nivel de Importancia Inicial (1-5)</label>
             <select 
               id="importance" 
               value={formData.importance}
@@ -98,6 +129,16 @@ export default function AddReport() {
               <option value="4">4 - Alta</option>
               <option value="5">5 - Crítica / Urgente</option>
             </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="image">Adjuntar Fotografía (Opcional)</label>
+            <input 
+              type="file" 
+              id="image" 
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files[0])}
+            />
           </div>
 
           <button type="submit" className="btn-primary" disabled={loading}>

@@ -4,7 +4,7 @@ echo "Este script asume que ya ejecutaste 'terraform apply' en la carpeta infrae
 
 # Reemplaza esto con tu IP publica de EC2 y nombre de bucket
 EC2_IP="TU_IP_PUBLICA_EC2"
-BUCKET_NAME="hito1-bucket" # o el nombre que hayas puesto en variables.tf
+BUCKET_NAME="ulalert-bucket-olea" # o el nombre que hayas puesto en variables.tf
 
 echo ""
 echo "1. DESPLIEGUE DEL FRONTEND (S3)"
