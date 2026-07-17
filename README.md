@@ -102,15 +102,13 @@ VITE_API_URL=https://abcd1234.execute-api.us-east-1.amazonaws.com
 
 # Agrega aquí otros enlaces necesarios para el proyecto
 
-# Configurar y desplegar el Frontend
+## Configurar y desplegar el Frontend
 
 Regresa al directorio principal e ingresa al frontend.
 
 ```bash
 cd ../frontend
 ```
-
-Abre el archivo donde se encuentra la configuración de la API (`src/config.ts` o `.env`) y reemplaza la URL por la **api_url** entregada por Terraform.
 
 Instala las dependencias:
 
