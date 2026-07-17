@@ -88,24 +88,19 @@ Será utilizada por el frontend para comunicarse con el backend.
 
 ## Configuración de la API
 
-Una vez obtenida la `api_url` desde Terraform, debes actualizarla manualmente en los siguientes archivos del frontend:
+Para mantener un código limpio, seguro y evitar modificar archivos manualmente, el frontend se conecta al backend utilizando variables de entorno. 
 
-- `frontend/src/pages/AddReport.jsx`
-- `frontend/src/pages/SectorView.jsx`
+Una vez que obtengas la `api_url` generada por Terraform al terminar el despliegue, sigue estos pasos:
 
-En ambos archivos, reemplaza la siguiente línea:
+1. Dirígete a la carpeta `frontend/`.
+2. Crea un nuevo archivo llamado `.env` en la raíz de esta carpeta (exactamente al mismo nivel que tu archivo `package.json`).
+3. Agrega la URL de tu API Gateway y cualquier otro enlace necesario para tu entorno. Tu archivo `.env` debería verse así:
 
-```javascript
-const API_URL = "https://xxxxxxxx.execute-api.us-east-1.amazonaws.com";
-```
+```env
+# URL base de API Gateway (Entregada por Terraform)
+VITE_API_URL=https://abcd1234.execute-api.us-east-1.amazonaws.com
 
-por la URL entregada por Terraform. Por ejemplo:
-
-```javascript
-const API_URL = "https://abcd1234.execute-api.us-east-1.amazonaws.com";
-```
-
-> **Importante:** No agregues `/prod` al final de la URL, ya que los endpoints de la aplicación construyen esa ruta automáticamente.
+# Agrega aquí otros enlaces necesarios para el proyecto
 
 # Configurar y desplegar el Frontend
 
