@@ -49,7 +49,7 @@ const Login = () => {
         </div>
 
         <div className="login-hint">
-          <small>Solo se admiten correos <b>@alumnos.ulagos.cl</b></small>
+          <small>Solo se admiten correos <b>@ulagos.cl</b> y <b>@alumnos.ulagos.cl</b></small>
         </div>
       </div>
     </div>

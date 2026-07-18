@@ -22,7 +22,7 @@ async function verifyUserRole(token) {
     const payload = ticket.getPayload();
     const email = payload.email;
 
-    if (!email.endsWith('@alumnos.ulagos.cl') && email !== 'admin@ulagos.cl' && email !== 'coordinador@ulagos.cl') {
+    if (!email.endsWith('@alumnos.ulagos.cl') && !email.endsWith('@ulagos.cl')) {
         throw new Error("Dominio no autorizado");
     }
 
@@ -30,12 +30,18 @@ async function verifyUserRole(token) {
         TableName: TABLE_NAME,
         Key: { id: `ADMIN#${email}` }
     }));
+    
+    let role = adminCheck.Item ? "admin" : "student";
+    
+    if (email === 'carlos.rojaslatorre@ulagos.cl') {
+        role = "admin";
+    }
 
     return {
         email,
         name: payload.name,
         picture: payload.picture,
-        role: adminCheck.Item ? "admin" : "student"
+        role
     };
 }
 
@@ -124,14 +130,13 @@ export const handler = async (event) => {
             try {
                 const user = await verifyUserRole(token);
                 const body = JSON.parse(event.body || "{}");
-                const { subSector, title, description, importance, imageUrl } = body;
+                const { subSector, title, description, imageUrl } = body;
 
                 const newReport = {
                     id: uuidv4(),
                     subSector,
                     title,
                     description,
-                    importance: parseInt(importance, 10),
                     imageUrl: imageUrl || null,
                     createdAt: new Date().toISOString(),
                     utility: 0,
@@ -156,18 +161,26 @@ export const handler = async (event) => {
 
                 const reportId = statusMatch[1];
                 const body = JSON.parse(event.body || "{}");
-                const { estado, criticidad } = body;
+                const { estado, criticidad, subSector } = body;
 
                 if (!estado || !criticidad) return { statusCode: 400, headers, body: JSON.stringify({ error: "Faltan datos" }) };
+
+                let UpdateExpression = "SET estado = :e, criticidad = :c";
+                let ExpressionAttributeValues = {
+                    ":e": estado,
+                    ":c": criticidad
+                };
+
+                if (subSector) {
+                    UpdateExpression += ", subSector = :s";
+                    ExpressionAttributeValues[":s"] = subSector;
+                }
 
                 const params = {
                     TableName: TABLE_NAME,
                     Key: { id: reportId },
-                    UpdateExpression: "SET estado = :e, criticidad = :c",
-                    ExpressionAttributeValues: {
-                        ":e": estado,
-                        ":c": criticidad
-                    },
+                    UpdateExpression,
+                    ExpressionAttributeValues,
                     ReturnValues: "ALL_NEW"
                 };
                 const result = await docClient.send(new UpdateCommand(params));

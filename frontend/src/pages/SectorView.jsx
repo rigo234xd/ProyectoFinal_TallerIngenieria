@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ThumbsUp, AlertTriangle, Calendar } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
@@ -23,6 +24,7 @@ export default function SectorView() {
   const [reports, setReports] = useState([]);
   const [sortBy, setSortBy] = useState('utility'); // 'utility', 'importance', 'date'
   const [loading, setLoading] = useState(true);
+  const [selectedReport, setSelectedReport] = useState(null);
 
   useEffect(() => {
     if (!sector) return;
@@ -150,29 +152,75 @@ export default function SectorView() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
                   <span className={`badge ${report.estado === 'en_progreso' ? 'badge-media' : 'badge-baja'}`}>
-                    {report.estado === 'en_progreso' ? '🚧 En Progreso' : '✅ Aprobado'}
+                    {report.estado === 'en_progreso' ? 'En Progreso' : 'Aprobado'}
                   </span>
                 </div>
               </div>
-              <p className="report-description" style={{ marginTop: '0.5rem' }}>{report.description}</p>
               
-              {report.imageUrl && (
-                <div style={{ marginTop: '1rem', borderRadius: '8px', overflow: 'hidden' }}>
-                  <img src={report.imageUrl} alt="Evidencia del reporte" style={{ width: '100%', maxHeight: '300px', objectFit: 'cover' }} />
+              <div className="report-footer" style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    A {report.utility || 0} personas les sirvió esto
+                  </span>
+                  <button className="btn-like" onClick={(e) => { e.stopPropagation(); handleLike(report.id); }}>
+                    <ThumbsUp size={16} /> Me sirvió
+                  </button>
                 </div>
-              )}
-              
-              <div className="report-footer" style={{ marginTop: '1rem' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                  A {report.utility || 0} personas les sirvió esto
-                </span>
-                <button className="btn-like" onClick={() => handleLike(report.id)}>
-                  <ThumbsUp size={16} /> Me sirvió
+                <button className="btn-primary" style={{ width: 'auto', padding: '0.4rem 1rem', fontSize: '0.9rem' }} onClick={() => setSelectedReport(report)}>
+                  Ver Detalles
                 </button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {selectedReport && createPortal(
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, overflowY: 'auto' }}>
+          <div className="modal-content glass-card animate-fade-in" style={{ width: '90%', maxWidth: '600px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{selectedReport.title}</h3>
+              <button 
+                onClick={() => setSelectedReport(null)}
+                style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-secondary)' }}
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className="report-meta" style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <Calendar size={14} /> 
+                {new Date(selectedReport.createdAt).toLocaleDateString()}
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <AlertTriangle size={14} />
+                Criticidad: <strong style={{textTransform:'capitalize'}}>{selectedReport.criticidad?.replace('_',' ')}</strong>
+              </span>
+              <span className={`badge ${selectedReport.estado === 'en_progreso' ? 'badge-media' : 'badge-baja'}`}>
+                {selectedReport.estado === 'en_progreso' ? 'En Progreso' : 'Aprobado'}
+              </span>
+            </div>
+
+            <p style={{ marginBottom: '1.5rem', lineHeight: '1.6' }}>{selectedReport.description}</p>
+            
+            {selectedReport.imageUrl && (
+              <div className="report-image-container" style={{ height: 'auto', maxHeight: '500px' }}>
+                <img src={selectedReport.imageUrl} alt="Evidencia del reporte" style={{ objectFit: 'contain' }} />
+              </div>
+            )}
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--surface-border)' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>
+                A {selectedReport.utility || 0} personas les sirvió esto
+              </span>
+              <button className="btn-like" onClick={() => handleLike(selectedReport.id)}>
+                <ThumbsUp size={16} /> Me sirvió
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

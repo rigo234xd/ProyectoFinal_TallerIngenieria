@@ -13,8 +13,7 @@ export default function AddReport() {
 
   const [formData, setFormData] = useState({
     title: '',
-    description: '',
-    importance: '3'
+    description: ''
   });
   const [imageFile, setImageFile] = useState(null);
 
@@ -116,29 +115,18 @@ export default function AddReport() {
             ></textarea>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="importance">Nivel de Importancia Inicial (1-5)</label>
-            <select 
-              id="importance" 
-              value={formData.importance}
-              onChange={(e) => setFormData({...formData, importance: e.target.value})}
-            >
-              <option value="1">1 - Muy Baja</option>
-              <option value="2">2 - Baja</option>
-              <option value="3">3 - Media</option>
-              <option value="4">4 - Alta</option>
-              <option value="5">5 - Crítica / Urgente</option>
-            </select>
-          </div>
 
           <div className="form-group">
             <label htmlFor="image">Adjuntar Fotografía (Opcional)</label>
             <input 
               type="file" 
               id="image" 
-              accept="image/*"
+              accept=".png, .jpg, .jpeg, .webp"
               onChange={(e) => setImageFile(e.target.files[0])}
             />
+            <small className="text-secondary" style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+              Formatos admitidos: PNG, JPG, JPEG, WEBP.
+            </small>
           </div>
 
           <button type="submit" className="btn-primary" disabled={loading}>

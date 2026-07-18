@@ -14,11 +14,11 @@ export default function Navbar() {
           <>
             <Link to="/perfil" style={{ marginLeft: '1rem' }}>Mi Perfil</Link>
             {user.role === 'admin' && (
-              <Link to="/admin" style={{ marginLeft: '1rem', color: 'var(--accent)' }}>Admin</Link>
+              <Link to="/admin" style={{ marginLeft: '1rem' }}>Admin</Link>
             )}
           </>
         ) : (
-          <Link to="/login" style={{ marginLeft: '1rem', background: 'var(--primary)', padding: '0.3rem 0.8rem', borderRadius: '4px' }}>Ingresar</Link>
+          <Link to="/login" style={{ marginLeft: '1rem' }}>Ingresar</Link>
         )}
       </div>
     </nav>

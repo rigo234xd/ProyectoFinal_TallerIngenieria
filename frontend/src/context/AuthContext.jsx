@@ -13,7 +13,26 @@ export const AuthProvider = ({ children }) => {
     const checkSession = async () => {
       const storedUser = localStorage.getItem('ulalert_user');
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          if (parsedUser.token) {
+            const decodedToken = jwtDecode(parsedUser.token);
+            // El token expira si su tiempo (en segundos) es menor a la fecha actual
+            if (decodedToken.exp * 1000 < Date.now()) {
+              console.log('Sesión expirada');
+              localStorage.removeItem('ulalert_user');
+              setUser(null);
+            } else {
+              setUser(parsedUser);
+            }
+          } else {
+            setUser(parsedUser);
+          }
+        } catch (error) {
+          console.error("Token inválido o corrupto", error);
+          localStorage.removeItem('ulalert_user');
+          setUser(null);
+        }
       }
       setLoading(false);
     };
@@ -27,10 +46,10 @@ export const AuthProvider = ({ children }) => {
       const decodedToken = jwtDecode(token);
       const email = decodedToken.email;
 
-      // Validación de dominio (Aceptamos @alumnos.ulagos.cl, coordinador y admin para pruebas)
-      if (!email.endsWith('@alumnos.ulagos.cl') && email !== 'admin@ulagos.cl' && email !== 'coordinador@ulagos.cl') {
+      // Validación de dominio
+      if (!email.endsWith('@alumnos.ulagos.cl') && !email.endsWith('@ulagos.cl')) {
         setLoading(false);
-        return { success: false, message: 'El correo debe pertenecer a @alumnos.ulagos.cl' };
+        return { success: false, message: 'El correo debe pertenecer a la universidad (@ulagos.cl o @alumnos.ulagos.cl)' };
       }
 
       // Consultar rol en el Backend enviando el TOKEN (para que la Lambda verifique criptográficamente)
